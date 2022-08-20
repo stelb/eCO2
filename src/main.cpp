@@ -7,10 +7,18 @@
 
 Preferences prefs;
 
+// timing
+unsigned long now;
+
 // LED
 #define LED_DATA_PIN 2
 #define NUM_LEDS 1
 CRGB leds[NUM_LEDS];
+// blinking
+unsigned long lastBlink = 0;
+#define BLINKINTERVAL 1000
+uint8_t colorIndex = 0;
+CRGB blinkPat[2];
 
 // sgp30 TVOC
 Adafruit_SGP30 sgp;
@@ -19,8 +27,12 @@ bool initialBaseline;
 unsigned long lastRead = 0;
 unsigned long nextSave;
 uint16_t tvocBaseline, eco2Baseline;
-const unsigned long saveInterval = 1000 * 60 * 60; // 1h
-const unsigned long readIntervall = 3000;          // 3s
+// 12h+5m
+#define FIRSTSAVE 1000 * 60 * 60 * 12 + 5 * 60 * 1000
+// 1h
+#define SAVEINTERVAL 1000 * 60 * 60
+// 3s
+#define READINTERVAL 3000
 
 uint32_t getAbsoluteHumidity(float temperature, float humidity)
 {
@@ -30,32 +42,18 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   return absoluteHumidityScaled;
 }
 
-
-void setup()
+void setup() // 3s
 {
   M5.begin();
   M5.Power.begin();
 
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-  leds[0] = CRGB::Red;
-  FastLED.show();
-  delay(2000);
-  leds[0] = CRGB::Green;
-  FastLED.show();
-  delay(2000);
-  leds[0] = CRGB::Blue;
-  FastLED.show();
-  delay(2000);
-
-  leds[0] = CRGB::Violet;
-  FastLED.show();
-  delay(2000);
+  FastLED.clear(true);
 
   // Wire.begin(GPIO_NUM_1, GPIO_NUM_0);
   Wire.begin();
 
   Serial.begin(115200);
-
   Serial.println("SGP30 eCO2");
 
   if (!sgp.begin())
@@ -80,19 +78,35 @@ void setup()
     // load into sensor
     sgp.setIAQBaseline(eco2Baseline, tvocBaseline);
     // save every hour
-    nextSave = millis() + saveInterval;
+    nextSave = millis() + SAVEINTERVAL;
   }
   else
   {
     // first baseline after 12h
-    nextSave = millis() + 1000 * 60 * 60 * 12 + 5 * 60 * 1000; // now + 12h + 5min
+    nextSave = millis() + FIRSTSAVE; // now + 12h + 5min
   }
+  blinkPat[0] = CRGB::Black;
+  blinkPat[1] = CRGB::White;
+  blinkPat[2] = CRGB::Blue;
+}
 
+void blink(CRGB col1, CRGB col2, CRGB col3)
+{
+  blinkPat[0] = col1;
+  blinkPat[1] = col2;
+  blinkPat[2] = col3;
 }
 
 void loop()
 {
-  if (millis() - lastRead > readIntervall)
+  now = millis();
+  if (now - lastBlink > BLINKINTERVAL)
+  {
+    leds[0] = blinkPat[colorIndex];
+    lastBlink = now;
+    colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
+  }
+  if (millis() - lastRead > READINTERVAL)
   {
     lastRead = millis();
     if (!sgp.IAQmeasure())
@@ -102,23 +116,28 @@ void loop()
     }
     if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
     {
-      leds[0] = CRGB::GreenYellow;
+      // leds[0] = CRGB::GreenYellow;
+      blink(CRGB::Green, CRGB::Yellow, initialBaseline ? CRGB::Green : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 1250 & sgp.eCO2 < 1750)
     {
-      leds[0] = CRGB::Yellow;
+      // leds[0] = CRGB::Yellow;
+      blink(CRGB::Yellow, CRGB::Yellow, initialBaseline ? CRGB::Yellow : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 1750 & sgp.eCO2 < 2000)
     {
-      leds[0] = CRGB::Orange;
+      // leds[0] = CRGB::Orange;
+      blink(CRGB::Orange, CRGB::Orange, initialBaseline ? CRGB::Orange : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 2000)
     {
-      leds[0] = CRGB::Red;
+      // leds[0] = CRGB::Red;
+      blink(CRGB::Red, CRGB::Red, initialBaseline ? CRGB::Red : CRGB::Blue);
     }
     else if (sgp.eCO2 < 1000)
     {
-      leds[0] = CRGB::Green;
+      // leds[0] = CRGB::Green;
+      blink(CRGB::Green, CRGB::Green, initialBaseline ? CRGB::Green : CRGB::Blue);
     }
     /*
             CO2 ppm < 1000 : grün
@@ -150,7 +169,7 @@ void loop()
       prefs.putUInt("eco2", eco2Baseline);
       prefs.putUInt("tvoc", tvocBaseline);
       // prefs.end();
-      nextSave = millis() + saveInterval;
+      nextSave = millis() + SAVEINTERVAL;
       // if first time: init true
       if (!initialBaseline)
       {
