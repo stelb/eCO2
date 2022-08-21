@@ -3,6 +3,9 @@
 
 #include <M5Unified.h>
 #include "Adafruit_SGP30.h"
+
+// avoid flickering while using i2c
+#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
 Preferences prefs;
@@ -109,11 +112,17 @@ void loop()
   if (millis() - lastRead > READINTERVAL)
   {
     lastRead = millis();
-    if (!sgp.IAQmeasure())
+    if (!sgp.IAQmeasure()) // tvoc/eco2
     {
       Serial.println("Measurement failed");
       return;
     }
+    if (!sgp.IAQmeasureRaw()) // h2/ethanol
+    {
+      Serial.println("Raw Measurement failed");
+      return;
+    }
+
     if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
     {
       // leds[0] = CRGB::GreenYellow;
@@ -154,11 +163,6 @@ void loop()
     Serial.print(sgp.eCO2);
     Serial.println(" ppm");
 
-    if (!sgp.IAQmeasureRaw())
-    {
-      Serial.println("Raw Measurement failed");
-      return;
-    }
     if (millis() > nextSave)
     {
       // save baseline, calc next save
