@@ -8,4 +8,8 @@
 ## TODO
 - wifi
 - OTA updating
-- expose data for scraping and graphing
+- expose data for scraping and graphing (MySensors?)
+- reset baselines
+- add temperature/humidity sensor
+- remember sensor serial and discard baseline on changed sensor
+- support sht30 sensor (temparature/humidity/air pressure)
