@@ -1,8 +1,11 @@
+//#define WM_DEBUG_LEVEL DEBUG_DEV
+#include <WiFiManager.h>
+
 #include <Wire.h>
 #include <Preferences.h>
 
 #include <M5Unified.h>
-#include "Adafruit_SGP30.h"
+#include <Adafruit_SGP30.h>
 
 // avoid flickering while using i2c
 #define FASTLED_ALLOW_INTERRUPTS 0
@@ -47,6 +50,27 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
 
 void setup() // 3s
 {
+  Serial.begin(115200);
+
+//  WiFi.mode(WIFI_STA);
+//  WiFiManager wm;
+
+/*
+  bool res;
+  res = wm.autoConnect("eCO2"); // password protected ap
+
+  if (!res)
+  {
+    Serial.println("Failed to connect");
+    // ESP.restart();
+  }
+  else
+  {
+    // if you get here you have connected to the WiFi
+    Serial.println("connected...yeey :)");
+  }
+*/
+
   M5.begin();
   M5.Power.begin();
 
@@ -56,7 +80,6 @@ void setup() // 3s
   // Wire.begin(GPIO_NUM_1, GPIO_NUM_0);
   Wire.begin();
 
-  Serial.begin(115200);
   Serial.println("SGP30 eCO2");
 
   if (!sgp.begin())
