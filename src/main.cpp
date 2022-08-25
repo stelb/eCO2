@@ -6,6 +6,8 @@
 
 #include <M5Unified.h>
 #include <Adafruit_SGP30.h>
+#include "Adafruit_SHT31.h"
+
 
 // avoid flickering while using i2c
 #define FASTLED_ALLOW_INTERRUPTS 0
@@ -40,6 +42,11 @@ uint16_t tvocBaseline, eco2Baseline;
 // 3s
 #define READINTERVAL 3000
 
+// SHT30
+bool sht30EnableHeater = false;
+Adafruit_SHT31 sht = Adafruit_SHT31();
+//uint8_t loopCnt = 0;
+
 uint32_t getAbsoluteHumidity(float temperature, float humidity)
 {
   // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
@@ -48,49 +55,33 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   return absoluteHumidityScaled;
 }
 
+void blink(CRGB col1, CRGB col2, CRGB col3)
+{
+  blinkPat[0] = col1;
+  blinkPat[1] = col2;
+  blinkPat[2] = col3;
+}
+
 void setup() // 3s
 {
   Serial.begin(115200);
-
-//  WiFi.mode(WIFI_STA);
-//  WiFiManager wm;
-
-/*
-  bool res;
-  res = wm.autoConnect("eCO2"); // password protected ap
-
-  if (!res)
-  {
-    Serial.println("Failed to connect");
-    // ESP.restart();
-  }
-  else
-  {
-    // if you get here you have connected to the WiFi
-    Serial.println("connected...yeey :)");
-  }
-*/
-
   M5.begin();
-  M5.Power.begin();
-
-  FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.clear(true);
-
   // Wire.begin(GPIO_NUM_1, GPIO_NUM_0);
   Wire.begin();
 
-  Serial.println("SGP30 eCO2");
+  Serial.println("eCO2 Sensor");
 
+  // SGP30 setup
   if (!sgp.begin())
   {
     Serial.println("Sensor not found :(");
-    //  while (1);
+    // do some error blinking
   }
   Serial.print("Found SGP30 serial #");
   Serial.print(sgp.serialnumber[0], HEX);
   Serial.print(sgp.serialnumber[1], HEX);
   Serial.println(sgp.serialnumber[2], HEX);
+  
 
   // stored prefs
   prefs.begin("eCO2");
@@ -111,30 +102,70 @@ void setup() // 3s
     // first baseline after 12h
     nextSave = millis() + FIRSTSAVE; // now + 12h + 5min
   }
-  blinkPat[0] = CRGB::Black;
-  blinkPat[1] = CRGB::White;
-  blinkPat[2] = CRGB::Blue;
-}
 
-void blink(CRGB col1, CRGB col2, CRGB col3)
-{
-  blinkPat[0] = col1;
-  blinkPat[1] = col2;
-  blinkPat[2] = col3;
+  if (!sht.begin(0x44))
+  { // Set to 0x45 for alternate i2c addr
+    Serial.println("Couldn't find SHT30");
+  }
+  Serial.print("Heater Enabled State: ");
+  if (sht.isHeaterEnabled())
+    Serial.println("ENABLED");
+  else
+    Serial.println("DISABLED");
+
+  // LED setup
+  FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.clear(true);
+  // startup blink colors
+  blink(CRGB::Black, CRGB::White, CRGB::Blue);
 }
 
 void loop()
 {
+  FastLED.delay(500); // 1000/60);
+
   now = millis();
   if (now - lastBlink > BLINKINTERVAL)
   {
     leds[0] = blinkPat[colorIndex];
     lastBlink = now;
     colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
+    FastLED.show();
   }
+
   if (millis() - lastRead > READINTERVAL)
   {
     lastRead = millis();
+
+    float t = sht.readTemperature();
+    float h = sht.readHumidity();
+
+    if (!isnan(t))
+    { // check if 'is not a number'
+      Serial.print("Temp *C = ");
+      Serial.print(t);
+      Serial.print("\t\t");
+    }
+    else
+    {
+      Serial.println("Failed to read temperature");
+    }
+
+    if (!isnan(h))
+    { // check if 'is not a number'
+      Serial.print("Hum. % = ");
+      Serial.println(h);
+    }
+    else
+    {
+      Serial.println("Failed to read humidity");
+    }
+
+    // if (!isnan(t) && !isnan(h))
+    //{
+    sgp.setHumidity(getAbsoluteHumidity(t, h));
+    //}
+
     if (!sgp.IAQmeasure()) // tvoc/eco2
     {
       Serial.println("Measurement failed");
@@ -148,27 +179,22 @@ void loop()
 
     if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
     {
-      // leds[0] = CRGB::GreenYellow;
       blink(CRGB::Green, CRGB::Yellow, initialBaseline ? CRGB::Green : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 1250 & sgp.eCO2 < 1750)
     {
-      // leds[0] = CRGB::Yellow;
       blink(CRGB::Yellow, CRGB::Yellow, initialBaseline ? CRGB::Yellow : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 1750 & sgp.eCO2 < 2000)
     {
-      // leds[0] = CRGB::Orange;
       blink(CRGB::Orange, CRGB::Orange, initialBaseline ? CRGB::Orange : CRGB::Blue);
     }
     else if (sgp.eCO2 >= 2000)
     {
-      // leds[0] = CRGB::Red;
       blink(CRGB::Red, CRGB::Red, initialBaseline ? CRGB::Red : CRGB::Blue);
     }
     else if (sgp.eCO2 < 1000)
     {
-      // leds[0] = CRGB::Green;
       blink(CRGB::Green, CRGB::Green, initialBaseline ? CRGB::Green : CRGB::Blue);
     }
     /*
@@ -211,8 +237,5 @@ void loop()
     Serial.print("Raw Ethanol ");
     Serial.print(sgp.rawEthanol);
     Serial.println("");
-    FastLED.show();
   }
-  FastLED.show();
-  FastLED.delay(500);
 }
