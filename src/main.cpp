@@ -1,5 +1,7 @@
 //#include <esp_task_wdt.h>
 
+//#include <MySensors.h>
+
 //#define WM_DEBUG_LEVEL DEBUG_DEV
 #include <WiFiManager.h>
 
@@ -75,20 +77,32 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
 }
 
 #ifdef USE_FASTLED
-void blink(CRGB col1, CRGB col2, CRGB col3)
+void setBlink(CRGB col1, CRGB col2, CRGB col3)
 {
   blinkPat[0] = col1;
   blinkPat[1] = col2;
   blinkPat[2] = col3;
 }
 #else
-void blink(uint32_t col1, uint32_t col2, uint32_t col3)
+void setBlink(uint32_t col1, uint32_t col2, uint32_t col3)
 {
   blinkPat[0] = col1;
   blinkPat[1] = col2;
   blinkPat[2] = col3;
 }
 #endif
+
+void blink()
+{
+#ifdef USE_FASTLED
+    leds[0] = blinkPat[colorIndex];
+    FastLED.show();
+#else
+    strip.setPixelColor(0, blinkPat[colorIndex]);
+    strip.show();
+#endif
+    colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
+}
 
 void wifi(void *parameter)
 {
@@ -146,23 +160,23 @@ void sensors()
 
   if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
   {
-    blink(GREEN, YELLOW, initialBaseline ? GREEN : BLUE);
+    setBlink(GREEN, YELLOW, initialBaseline ? GREEN : BLUE);
   }
   else if (sgp.eCO2 >= 1250 & sgp.eCO2 < 1750)
   {
-    blink(YELLOW, YELLOW, initialBaseline ? YELLOW : BLUE);
+    setBlink(YELLOW, YELLOW, initialBaseline ? YELLOW : BLUE);
   }
   else if (sgp.eCO2 >= 1750 & sgp.eCO2 < 2000)
   {
-    blink(ORANGE, ORANGE, initialBaseline ? ORANGE : BLUE);
+    setBlink(ORANGE, ORANGE, initialBaseline ? ORANGE : BLUE);
   }
   else if (sgp.eCO2 >= 2000)
   {
-    blink(RED, RED, initialBaseline ? RED : BLUE);
+    setBlink(RED, RED, initialBaseline ? RED : BLUE);
   }
   else if (sgp.eCO2 < 1000)
   {
-    blink(GREEN, GREEN, initialBaseline ? GREEN : BLUE);
+    setBlink(GREEN, GREEN, initialBaseline ? GREEN : BLUE);
   }
   /*
           CO2 ppm < 1000 : grün
@@ -278,28 +292,24 @@ void setup() // 3s
     Serial.println("DISABLED");
 
     // LED setup
+    strip.setBrightness(40);
 #ifdef USE_FASTLED
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear(true);
 #endif
   // startup blink colors
-  blink(ORANGE, WHITE, BLUE);
+  setBlink(ORANGE, WHITE, BLUE);
   // xTaskCreate(sensors, "read sensors", 4000, NULL, 1, NULL);
   wifi(NULL);
 }
+
+
 
 void loop()
 {
   EVERY_N_MILLIS(BLINKINTERVAL)
   {
-#ifdef USE_FASTLED
-    leds[0] = blinkPat[colorIndex];
-    FastLED.show();
-#else
-    strip.setPixelColor(0, blinkPat[colorIndex]);
-    strip.show();
-#endif
-    colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
+    blink();
   }
 
   EVERY_N_MILLIS(READINTERVAL)
