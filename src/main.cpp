@@ -43,9 +43,9 @@ unsigned long lastBlink = 0;
 #define BLINKINTERVAL 1000
 uint8_t colorIndex = 0;
 #ifdef USE_FASTLED
-CRGB blinkPat[2];
+CRGB blinkPat[3];
 #else
-uint32_t blinkPat[2];
+uint32_t blinkPat[3];
 #endif
 
 // sgp30 TVOC
