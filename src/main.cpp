@@ -157,7 +157,17 @@ void sensors()
     Serial.println("Raw Measurement failed");
     return;
   }
-
+  // reset sensor on very high values
+  if (sgp.eCO2 > 57000)
+  {
+    sgp.softReset();
+    sgp.begin();
+    if (!initialBaseline)
+      nextSave = millis() + FIRSTSAVE;
+    else
+      nextSave = millis() + SAVEINTERVAL;
+    return;
+  }
   if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
   {
     setBlink(GREEN, YELLOW, initialBaseline ? GREEN : BLUE);
