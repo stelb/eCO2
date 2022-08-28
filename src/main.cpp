@@ -2,6 +2,8 @@
 
 //#include <MySensors.h>
 
+#include <EasyButton.h>
+
 //#define WM_DEBUG_LEVEL DEBUG_DEV
 #include <WiFiManager.h>
 
@@ -25,6 +27,7 @@
 
 // Button
 #define BUTTON_PIN 3
+EasyButton button(BUTTON_PIN);
 
 Preferences prefs;
 
@@ -43,6 +46,7 @@ Adafruit_NeoPixel strip(NUM_LEDS, LED_DATA_PIN, NEO_GRB + NEO_KHZ800);
 // blinking
 unsigned long lastBlink = 0;
 #define BLINKINTERVAL 1000
+uint16_t blinkInterval = BLINKINTERVAL;
 uint8_t colorIndex = 0;
 #ifdef USE_FASTLED
 CRGB blinkPat[3];
@@ -95,19 +99,19 @@ void setBlink(uint32_t col1, uint32_t col2, uint32_t col3)
 void blink()
 {
 #ifdef USE_FASTLED
-    leds[0] = blinkPat[colorIndex];
-    FastLED.show();
+  leds[0] = blinkPat[colorIndex];
+  FastLED.show();
 #else
-    strip.setPixelColor(0, blinkPat[colorIndex]);
-    strip.show();
+  strip.setPixelColor(0, blinkPat[colorIndex]);
+  strip.show();
 #endif
-    colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
+  colorIndex = colorIndex == 2 ? 0 : colorIndex + 1;
 }
+
+WiFiManager wifiManager;
 
 void wifi(void *parameter)
 {
-  WiFiManager wifiManager;
-
   wifiManager.autoConnect("eCO2");
   //  FastLED.delay(1000);
 
@@ -239,6 +243,17 @@ void sensorsTask(void *parameter)
   }
 }
 
+bool setMode = false;
+bool setLevel = false;
+int setting = 0;
+
+void enterSetup()
+{
+  setMode = true;
+  blinkInterval = 200;
+  setBlink(BLACK, RED, BLACK);
+}
+
 void setup() // 3s
 {
 
@@ -246,8 +261,10 @@ void setup() // 3s
   M5.begin();
   // Wire.begin(GPIO_NUM_1, GPIO_NUM_0);
   Wire.begin();
+  button.begin();
+  button.onSequence(3, 2000, enterSetup);
 
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  // pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   Serial.println("eCO2 Sensor");
 
@@ -301,8 +318,8 @@ void setup() // 3s
   else
     Serial.println("DISABLED");
 
-    // LED setup
-    strip.setBrightness(40);
+  // LED setup
+  strip.setBrightness(40);
 #ifdef USE_FASTLED
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear(true);
@@ -313,17 +330,81 @@ void setup() // 3s
   wifi(NULL);
 }
 
-
+void settings()
+{
+  setLevel = true;
+  if (button.pressedFor(2000))
+  {
+    switch (setting)
+    {
+    case 1:
+      // reset wifi
+      wifiManager.startConfigPortal("eCO2");
+      break;
+    case 2:
+      // reset baseline
+      sgp.softReset();
+      // wait 12h for new baseline values..
+      initialBaseline = false;
+      prefs.putBool("init", false);
+      break;
+    case 3:
+      // reboot
+      break;
+    default:
+      break;
+    }
+    setMode = false;
+    setLevel = false;
+    return;
+  }
+  if (button.wasReleased())
+  {
+    setting++;
+    switch (setting)
+    {
+    case 1:
+      setBlink(BLACK, BLUE, BLACK);
+      break;
+    case 2:
+      setBlink(RED, YELLOW, BLACK);
+      break;
+    case 3:
+      setBlink(GREEN, RED, GREEN);
+    default:
+      setting = 0; // back to first option
+      break;
+    }
+  }
+}
 
 void loop()
 {
-  EVERY_N_MILLIS(BLINKINTERVAL)
+  button.read();
+  //
+  if (!setMode && button.pressedFor(10000))
   {
-    blink();
+    Serial.println("longpress");
+    blinkInterval = 200;
+    setBlink(BLACK, RED, BLACK);
+    setMode = true;
   }
 
-  EVERY_N_MILLIS(READINTERVAL)
+  if (!setMode)
   {
-    sensors();
+    EVERY_N_MILLIS(READINTERVAL)
+    {
+      sensors();
+    }
+  }
+  else
+  {
+    if (setLevel || button.releasedFor(50))
+      settings();
+  }
+
+  EVERY_N_MILLIS(blinkInterval)
+  {
+    blink();
   }
 }

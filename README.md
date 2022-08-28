@@ -6,11 +6,21 @@
 - as stamp c3 is not supported directly by platformio, needed config is in platformio.ini
 - SHT30 sensor supported (required right now actually..)
 - Wifi support with wifimanager, not used yet
+- baseline & wifi config reset possible
+
+## Reset config
+There is only one button and one led, so:
+ - start config mode: 3 buttonclicks in 2s (red blinking)
+ - short click cycle through options
+   - blue blinking: wifi reset
+   - red, yellow blinking: baseline reset
+   - green, red blinking: not used yet
+ - activate option: press 2s
+ - after this: normal operation
 
 ## TODO
 - OTA updating (included in wfimanager?)
 - expose data for scraping and graphing (MySensors?)
-- reset baselines / wificonfig
 - making SHT30 optional
 - remember sensor serial and discard baseline on changed sensor
 - support sht30 sensor (temparature/humidity/air pressure)
