@@ -66,7 +66,6 @@ namespace sensor
         // stored prefs
         prefs.begin("eCO2");
         initialBaseline = prefs.getBool("init", false);
-        Serial.println("got baseline");
 
         if (full)
         {
