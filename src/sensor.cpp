@@ -58,6 +58,39 @@ namespace sensor
         return absoluteHumidityScaled;
     }
 
+    void startsgp(boolean full = false)
+    {
+        sgp.softReset();
+        sgp.begin();
+
+        // stored prefs
+        prefs.begin("eCO2");
+        initialBaseline = prefs.getBool("init", false);
+        Serial.println("got baseline");
+
+        if (full)
+        {
+            Serial.println("reset baseline");
+            initialBaseline = false;
+            prefs.putBool("init", false);
+        }
+        if (initialBaseline)
+        {
+            // read existing baselines
+            eco2Baseline = prefs.getUInt("eco2");
+            tvocBaseline = prefs.getUInt("tvoc");
+            // load into sensor
+            sgp.setIAQBaseline(eco2Baseline, tvocBaseline);
+            // save every hour
+            nextSave = millis() + TVOC_SAVEINTERVAL;
+        }
+        else
+        {
+            // first baseline after 12h
+            nextSave = millis() + TVOC_FIRSTSAVE; // now + 12h + 5min
+        }
+    }
+
     void setup(char *sensorID)
     {
 
@@ -128,35 +161,8 @@ namespace sensor
         Serial.print(sgp.serialnumber[1], HEX);
         Serial.println(sgp.serialnumber[2], HEX);
 
-        // stored prefs
-        prefs.begin("eCO2");
-        Serial.println("finished prefs setup");
+        startsgp();
 
-        // // baseline reset on start
-        // if (digitalRead(BUTTON_PIN) == LOW)
-        // {
-        //     Serial.println("Baseline reset!");
-        //     prefs.putBool("init", false);
-        // }
-        // do we have initial baseline?
-        initialBaseline = prefs.getBool("init", false);
-        Serial.println("got baseline");
-
-        if (initialBaseline)
-        {
-            // read existing baselines
-            eco2Baseline = prefs.getUInt("eco2");
-            tvocBaseline = prefs.getUInt("tvoc");
-            // load into sensor
-            sgp.setIAQBaseline(eco2Baseline, tvocBaseline);
-            // save every hour
-            nextSave = millis() + TVOC_SAVEINTERVAL;
-        }
-        else
-        {
-            // first baseline after 12h
-            nextSave = millis() + TVOC_FIRSTSAVE; // now + 12h + 5min
-        }
         Serial.println("finished sgp setup");
 
         // sht setup
@@ -183,10 +189,6 @@ namespace sensor
         values["humidity"] = (int)(h * 100 + 0.5) / 100.0;
         values["co2"] = co2;
         serializeJson(values, payload);
-        /*         sprintf(payload, "{\"temperature\": \"%.2f\", "
-                                 "\"humidity\":\"%.2f\", "
-                                 "\"co2\":\"%u\"}",
-                        t, h, sgp.eCO2); */
 
         if (!mqttClient.connected())
         {
@@ -242,13 +244,7 @@ namespace sensor
         // reset sensor on very high values
         if (sgp.eCO2 > 57000)
         {
-            sgp.softReset();
-            sgp.begin();
-            if (!initialBaseline)
-                nextSave = millis() + TVOC_FIRSTSAVE;
-            else
-                nextSave = millis() + TVOC_SAVEINTERVAL;
-            return;
+            startsgp();
         }
 
         if (sgp.eCO2 >= 1000 & sgp.eCO2 < 1250)
@@ -317,7 +313,5 @@ namespace sensor
         Serial.println("");
         publish(t, h, sgp.eCO2);
     }
-    void reset()
-    {
-    }
+
 }

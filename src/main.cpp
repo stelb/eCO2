@@ -89,18 +89,14 @@ void settings()
     switch (setting)
     {
     case 1:
-      // reset wifi
+      // configure wifi
       wifi(NULL);
       break;
     case 2:
-      // reset baseline
-      // sgp.softReset();
-      // wait 12h for new baseline values..
-      // initialBaseline = false;
-      // prefs.putBool("init", false);
+      sensor::startsgp(true);
       break;
     case 3:
-      // reboot
+      // exit
       break;
     default:
       break;
