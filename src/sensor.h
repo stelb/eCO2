@@ -1,3 +1,4 @@
+#include <Arduino.h>
 namespace sensor
 {
     void setup(char *sensorID);
