@@ -140,16 +140,17 @@ void setup() // 3s
   blinkNS::setup();
   // startup blink colors
   blinkNS::set(ORANGE, WHITE, BLUE);
+  // start blinking
+  xTaskCreate(blinkTask, "blinking", 1024, NULL, 1, NULL);
 
   // config wifi & mqtt server
   wifi(NULL);
 
+  // sensor setup
   sensor::setup(sensorID);
-
   // start sensor readings task
   xTaskCreate(sensorsTask, "sensors", 4000, NULL, 1, NULL);
-  // start blinking
-  xTaskCreate(blinkTask, "blinking", 1024, NULL, 1, NULL);
+
 }
 
 void loop()
