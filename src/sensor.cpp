@@ -89,6 +89,7 @@ namespace sensor
             // first baseline after 12h
             nextSave = millis() + TVOC_FIRSTSAVE; // now + 12h + 5min
         }
+        prefs.end();
     }
 
     void setup(char *sensorID)
