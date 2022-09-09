@@ -7,6 +7,8 @@
 - SHT30 sensor supported (required right now actually..)
 - Wifi support with wifimanager, not used yet
 - baseline & wifi config reset possible
+- homeassistant mqtt autodiscovery
+- mqtt config via wifimanager
 
 ## Reset config
 There is only one button and one led, so:
@@ -26,4 +28,7 @@ There is only one button and one led, so:
 - support sht30 sensor (temparature/humidity/air pressure)
 
 ## Problems
-Wifi and FastLED SK6812 is very unstable, so back to Adafruit neopixel.
+Wifi and FastLED SK6812 is very unstable, code completely removed
+still some code cleanup needed
+error handling
+new code structure broke settings mode

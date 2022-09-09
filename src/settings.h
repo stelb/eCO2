@@ -1,0 +1,2 @@
+// settings.h
+void settings();
